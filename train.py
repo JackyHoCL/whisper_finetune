@@ -215,8 +215,8 @@ trainer = Seq2SeqTrainer(
 processor.save_pretrained(training_args.output_dir)
 
 # %%
-# trainer.train()
-trainer.train(resume_from_checkpoint=True)
+trainer.train()
+# trainer.train(resume_from_checkpoint=True)
 
 
 #%%
