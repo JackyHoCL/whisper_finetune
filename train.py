@@ -20,10 +20,10 @@ import time
 
 # %%
 cache_dir = '/mnt/8THDD0/storage/huggingface'
-model_name = "openai/whisper-small"
-target_lang = 'zh'
+# model_name = "openai/whisper-small"
+target_lang = 'yue'
 common_voice_lang = "zh-HK"
-# model_name = "openai/whisper-large-v3-turbo"
+model_name = "openai/whisper-large-v3-turbo"
 output_dir = "/mnt/8THDD0/storage/train/output/"+ model_name.split('/')[1] +"-" + target_lang
 model_path = model_name
 
@@ -83,7 +83,7 @@ def prepare_dataset(batch):
     return batch
 
 # %%
-common_voice = common_voice.map(prepare_dataset, remove_columns=common_voice.column_names["train"], num_proc=4)
+common_voice = common_voice.map(prepare_dataset, remove_columns=common_voice.column_names["train"], num_proc=2)
 
 model = WhisperForConditionalGeneration.from_pretrained(model_path, cache_dir=cache_dir)
 model.generation_config.language = target_lang
@@ -178,13 +178,13 @@ training_args = Seq2SeqTrainingArguments(
     output_dir=output_dir,  # change to a repo name of your choice
     per_device_train_batch_size=16,
     gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
-    learning_rate=1e-5,
+    learning_rate=2e-5,
     warmup_steps=100,
-    max_steps=32000,
+    max_steps=30000,
     gradient_checkpointing=True,
     fp16=True,
     eval_strategy="steps",
-    per_device_eval_batch_size=64,
+    per_device_eval_batch_size=16,
     predict_with_generate=True,
     generation_max_length=225,
     save_steps=1000,
@@ -195,7 +195,7 @@ training_args = Seq2SeqTrainingArguments(
     # metric_for_best_model="cer",
     greater_is_better=False,
     push_to_hub=False,
-    dataloader_num_workers=4,
+    dataloader_num_workers=6,
     dataloader_pin_memory=True,
 )
 
@@ -215,8 +215,8 @@ trainer = Seq2SeqTrainer(
 processor.save_pretrained(training_args.output_dir)
 
 # %%
-# trainer.train()
-trainer.train(resume_from_checkpoint=True)
+trainer.train()
+# trainer.train(resume_from_checkpoint=True)
 
 
 #%%
