@@ -1,0 +1,10 @@
+transformers
+datasets
+evaluate
+accelerate
+tokenizers
+huggingface_hub
+datasets[audio]
+jiwer
+tensorboard
+gradio
