@@ -22,7 +22,8 @@ import time
 cache_dir = '/mnt/8THDD0/storage/huggingface'
 model_name = "openai/whisper-small"
 target_lang = 'zh'
-common_voice_lang = "zh-HK"
+common_voice_11_lang = "zh-HK"
+common_voice_17_lang = "yue"
 # model_name = "openai/whisper-large-v3-turbo"
 output_dir = "/mnt/8THDD0/storage/train/output/"+ model_name.split('/')[1] +"-" + target_lang
 model_path = model_name
@@ -32,13 +33,19 @@ feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name, cache_di
 tokenizer = WhisperTokenizer.from_pretrained(model_name, language=target_lang, task="transcribe", cache_dir=cache_dir)
 processor = WhisperProcessor.from_pretrained(model_name, language=target_lang, task="transcribe", cache_dir=cache_dir)
 # %%
+common_voice_11 = DatasetDict()
+common_voice_11_1 = DatasetDict()
+common_voice_17 = DatasetDict()
 common_voice = DatasetDict()
-
 # %%
-common_voice["train"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_lang, split="train+validation", trust_remote_code=True, cache_dir=cache_dir)
-common_voice["test"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_lang, split="test", trust_remote_code=True, cache_dir=cache_dir)
-# common_voice["validation"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_lang, split="validation", trust_remote_code=True, cache_dir=cache_dir)
-
+common_voice_11["train"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_11_lang, split="train+validation", trust_remote_code=True, cache_dir=cache_dir)
+common_voice_11["test"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_11_lang, split="test", trust_remote_code=True, cache_dir=cache_dir)
+common_voice_11_1["train"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_17_lang, split="train+validation", trust_remote_code=True, cache_dir=cache_dir)
+common_voice_11_1["test"] = load_dataset("mozilla-foundation/common_voice_11_0", common_voice_17_lang, split="test", trust_remote_code=True, cache_dir=cache_dir)
+common_voice_17["train"] = load_dataset("mozilla-foundation/common_voice_17_0", common_voice_17_lang, split="train+validation", trust_remote_code=True, cache_dir=cache_dir)
+common_voice_17["test"] = load_dataset("mozilla-foundation/common_voice_17_0", common_voice_17_lang, split="test", trust_remote_code=True, cache_dir=cache_dir)
+common_voice["train"] = concatenate_datasets([common_voice_11["train"], common_voice_11_1["train"], common_voice_17["train"]])
+common_voice["test"] = concatenate_datasets([common_voice_11["test"], common_voice_11_1["test"], common_voice_17["test"]])
 common_voice = common_voice.remove_columns(["accent", "age", "client_id", "down_votes", "gender", "locale", "path", "segment", "up_votes"])
 common_voice = common_voice.cast_column("audio", Audio(sampling_rate=16000))
 
@@ -176,11 +183,11 @@ def compute_metrics(pred:  EvalPrediction):
 # %%
 training_args = Seq2SeqTrainingArguments(
     output_dir=output_dir,  # change to a repo name of your choice
-    per_device_train_batch_size=16,
+    per_device_train_batch_size=32,
     gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
     learning_rate=1e-5,
     warmup_steps=100,
-    max_steps=32000,
+    max_steps=50000,
     gradient_checkpointing=True,
     fp16=True,
     eval_strategy="steps",
