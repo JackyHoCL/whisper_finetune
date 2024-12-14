@@ -58,6 +58,7 @@ print(common_voice["train"][0])
 cantonese_english = load_dataset("AlienKevin/mixed_cantonese_and_english_speech", split='train',  trust_remote_code=True, cache_dir=cache_dir)
 cantonese_english = cantonese_english.remove_columns(["topic"])
 cantonese_english = cantonese_english.cast_column("audio", Audio(sampling_rate=16000)).shuffle(seed=42).shuffle(seed=64)
+
 train_size = int(len(cantonese_english) * 0.8)
 
 print(train_size)
@@ -69,9 +70,17 @@ cantonese_english_test = cantonese_english.select(range(train_size, len(cantones
 print('mixed train_records: ' + str(len(cantonese_english_train)))
 print('mixed test_records: ' + str(len(cantonese_english_test)))
 
+cantonese_daily = load_dataset("ziyou-li/cantonese_daily", split='train',  trust_remote_code=True, cache_dir=cache_dir)
+cantonese_daily = cantonese_english.cast_column("audio", Audio(sampling_rate=16000)).shuffle(seed=42).shuffle(seed=64)
 
-common_voice["train"] = concatenate_datasets([common_voice["train"], cantonese_english_train]).shuffle(seed=42).shuffle(seed=64)
-common_voice["test"] = concatenate_datasets([common_voice["test"], cantonese_english_test]).shuffle(seed=42).shuffle(seed=64)
+train_size_daily = int(len(cantonese_daily) * 0.8)
+
+cantonese_daily_train = cantonese_english.select(range(0, train_size_daily))
+cantonese_daily_test = cantonese_english.select(range(train_size_daily, len(cantonese_daily)))
+
+
+common_voice["train"] = concatenate_datasets([common_voice["train"], cantonese_english_train, cantonese_daily_train]).shuffle(seed=42).shuffle(seed=64)
+common_voice["test"] = concatenate_datasets([common_voice["test"], cantonese_english_test, cantonese_daily_test]).shuffle(seed=42).shuffle(seed=64)
 
 print(common_voice["train"][0])
 print('merged train_records: ' + str(len(common_voice["train"])))
