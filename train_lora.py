@@ -116,7 +116,7 @@ def prepare_dataset(batch):
 # %%
 common_voice = common_voice.map(prepare_dataset, remove_columns=common_voice.column_names["train"], num_proc=4)
 
-model = WhisperForConditionalGeneration.from_pretrained(model_path, cache_dir=cache_dir)
+model = WhisperForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16, cache_dir=cache_dir)
 model.generation_config.language = target_lang
 model.generation_config.task = "transcribe"
 
@@ -204,13 +204,64 @@ def compute_metrics(pred:  EvalPrediction):
     # return {"cer": cer}
     return {"cer": cer_sample}
 
-# %%
+
+
+# # %%
+# processor.save_pretrained(training_args.output_dir)
+
+# # %%
+# trainer.train()
+# # trainer.train(resume_from_checkpoint=True)
+
+
+# #%%
+# pipe = pipeline(task="automatic-speech-recognition", model=model, tokenizer=tokenizer)
+# try:
+#     pipe.save_pretrained(training_args.output_dir + '/final')
+# except:
+#     pipe.save_pretrained(training_args.output_dir + '/result')
+
+
+# %% lora
+
+from peft import LoraConfig, PeftModel, LoraModel, LoraConfig, get_peft_model
+from transformers import Seq2SeqTrainer, TrainerCallback, TrainingArguments, TrainerState, TrainerControl
+from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+import os
+
+lora_config = LoraConfig(r=16, lora_alpha=32, target_modules=["q_proj", "v_proj"], lora_dropout=0.05, bias="none")
+
+model = get_peft_model(model, lora_config)
+
+model.print_trainable_parameters()
+
+
+
+class SavePeftModelCallback(TrainerCallback):
+    def on_save(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        checkpoint_folder = os.path.join(args.output_dir, f"{PREFIX_CHECKPOINT_DIR}-{state.global_step}")
+
+        peft_model_path = os.path.join(checkpoint_folder, "adapter_model")
+        kwargs["model"].save_pretrained(peft_model_path)
+
+        pytorch_model_path = os.path.join(checkpoint_folder, "pytorch_model.bin")
+        if os.path.exists(pytorch_model_path):
+            os.remove(pytorch_model_path)
+        return control
+
+# # %%
 training_args = Seq2SeqTrainingArguments(
     output_dir=output_dir,  # change to a repo name of your choice
     per_device_train_batch_size=32,
     gradient_accumulation_steps=1,  # increase by 2x for every 2x decrease in batch size
     learning_rate=1e-5,
-    warmup_steps=1000,
+    warmup_steps=500,
     max_steps=6000,
     gradient_checkpointing=True,
     fp16=True,
@@ -228,9 +279,11 @@ training_args = Seq2SeqTrainingArguments(
     push_to_hub=False,
     dataloader_num_workers=5,
     dataloader_pin_memory=True,
+    label_names=["labels"],
+    remove_unused_columns=False
 )
 
-# %%
+# # %%
 trainer = Seq2SeqTrainer(
     args=training_args,
     model=model,
@@ -239,20 +292,11 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
+    callbacks=[SavePeftModelCallback],
 )
 
-
-# %%
-processor.save_pretrained(training_args.output_dir)
-
-# %%
-trainer.train()
-# trainer.train(resume_from_checkpoint=True)
+model.config.use_cache = False
 
 
-#%%
-pipe = pipeline(task="automatic-speech-recognition", model=model, tokenizer=tokenizer)
-try:
-    pipe.save_pretrained(training_args.output_dir + '/final')
-except:
-    pipe.save_pretrained(training_args.output_dir + '/result')
+# trainer.train()
+# trainer.save_model()
